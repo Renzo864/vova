@@ -1,0 +1,1809 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4a6bdf;
+            --secondary-color: #6c5ce7;
+            --dark-color: #1a1a2e;
+            --light-color: #f1f1f1;
+            --accent-color: #00cec9;
+            --text-color: #e6e6e6;
+            --text-dark: #333;
+            --preview-width: 300px;
+            --system-info-bg: rgba(60, 60, 90, 0.95);
+            --context-menu-bg: rgba(40, 40, 60, 0.95);
+            --icon-size: 48px;
+            --selection-color: rgba(74, 107, 223, 0.3);
+            --sidebar-width: 250px;
+            --sidebar-collapsed-width: 60px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            transition: background-color 0.3s ease;
+        }
+
+        body.theme-light {
+            --dark-color: #f5f5f5;
+            --light-color: #1a1a2e;
+            --text-color: #333;
+            --text-dark: #e6e6e6;
+            --system-info-bg: rgba(240, 240, 240, 0.95);
+            --context-menu-bg: rgba(220, 220, 220, 0.95);
+            --selection-color: rgba(74, 107, 223, 0.2);
+        }
+
+        .quantum-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(-45deg, #1a1a2e, #16213e, #0f3460, #533483);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            z-index: -1;
+        }
+
+        body.theme-light .quantum-background {
+            background: linear-gradient(-45deg, #e0e0e0, #d0d0e0, #c0c0e0, #d0d0f0);
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .explorer-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            background-color: rgba(26, 26, 46, 0.85);
+            backdrop-filter: blur(5px);
+            color: var(--text-color);
+        }
+
+        body.theme-light .explorer-container {
+            background-color: rgba(245, 245, 245, 0.9);
+        }
+
+        .explorer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: rgba(31, 31, 56, 0.7);
+            border-bottom: 1px solid rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .explorer-header {
+            background-color: rgba(220, 220, 230, 0.9);
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-buttons button {
+            background-color: rgba(67, 76, 110, 0.5);
+            border: none;
+            color: var(--text-color);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        body.theme-light .nav-buttons button {
+            background-color: rgba(180, 180, 200, 0.7);
+            color: var(--text-dark);
+        }
+
+        .nav-buttons button:hover {
+            background-color: rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .nav-buttons button:hover {
+            background-color: rgba(150, 150, 180, 0.9);
+        }
+
+        .nav-buttons button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .refresh-btn {
+            background-color: rgba(67, 76, 110, 0.5);
+            border: none;
+            color: var(--text-color);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-left: 10px;
+        }
+
+        body.theme-light .refresh-btn {
+            background-color: rgba(180, 180, 200, 0.7);
+            color: var(--text-dark);
+        }
+
+        .refresh-btn:hover {
+            background-color: rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .refresh-btn:hover {
+            background-color: rgba(150, 150, 180, 0.9);
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            background-color: rgba(67, 76, 110, 0.5);
+            border-radius: 20px;
+            padding: 5px 15px;
+            width: 60%;
+            transition: all 0.3s ease;
+        }
+
+        body.theme-light .search-box {
+            background-color: rgba(180, 180, 200, 0.7);
+        }
+
+        .search-box:hover {
+            background-color: rgba(67, 76, 110, 0.8);
+        }
+
+        body.theme-light .search-box:hover {
+            background-color: rgba(150, 150, 180, 0.9);
+        }
+
+        .search-box i {
+            margin-right: 10px;
+            color: var(--accent-color);
+        }
+
+        .search-box input {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            padding: 8px 0;
+            outline: none;
+            font-size: 14px;
+        }
+
+        body.theme-light .search-box input {
+            color: var(--text-dark);
+        }
+
+        .view-options {
+            display: flex;
+            align-items: center;
+        }
+
+        .view-options button {
+            background-color: transparent;
+            border: none;
+            color: var(--text-color);
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+
+        body.theme-light .view-options button {
+            color: var(--text-dark);
+        }
+
+        .view-options button:hover {
+            background-color: rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .view-options button:hover {
+            background-color: rgba(150, 150, 180, 0.9);
+        }
+
+        .view-options button.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .main-content {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: rgba(31, 31, 56, 0.6);
+            padding: 15px;
+            overflow-y: auto;
+            border-right: 1px solid rgba(113, 128, 185, 0.3);
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        body.theme-light .sidebar {
+            background-color: rgba(220, 220, 230, 0.8);
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+            overflow: hidden;
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            background: rgba(31, 31, 56, 0.8);
+            border: 1px solid rgba(113, 128, 185, 0.5);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            transform: translateY(-50%);
+        }
+
+        body.theme-light .sidebar-toggle {
+            background: rgba(220, 220, 230, 0.9);
+            border-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .drives-list h3, .quick-access h3 {
+            font-size: 14px;
+            text-transform: uppercase;
+            color: var(--accent-color);
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .drive-item, .quick-access li {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .drive-item:hover, .quick-access li:hover {
+            background-color: rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .drive-item:hover,
+        body.theme-light .quick-access li:hover {
+            background-color: rgba(150, 150, 180, 0.5);
+        }
+
+        .drive-item i {
+            margin-right: 10px;
+            color: var(--primary-color);
+        }
+
+        .quick-access li i {
+            margin-right: 10px;
+            color: var(--accent-color);
+        }
+
+        .quick-access li span {
+            display: inline-block;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar.collapsed .quick-access li span,
+        .sidebar.collapsed .drives-list h3,
+        .sidebar.collapsed .quick-access h3,
+        .sidebar.collapsed .open-dir-btn span {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+            position: absolute;
+        }
+
+        .sidebar.collapsed .quick-access li,
+        .sidebar.collapsed .drive-item {
+            justify-content: center;
+            padding: 10px 5px;
+        }
+
+        .sidebar.collapsed .quick-access li i,
+        .sidebar.collapsed .drive-item i {
+            margin-right: 0;
+            font-size: 20px;
+        }
+
+        .file-explorer {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .path-navigator {
+            padding: 10px 20px;
+            background-color: rgba(31, 31, 56, 0.5);
+            border-bottom: 1px solid rgba(113, 128, 185, 0.3);
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        body.theme-light .path-navigator {
+            background-color: rgba(220, 220, 230, 0.8);
+        }
+
+        .path-segment {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 5px 8px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .path-segment:hover {
+            background-color: rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .path-segment:hover {
+            background-color: rgba(150, 150, 180, 0.5);
+        }
+
+        .path-separator {
+            margin: 0 5px;
+            color: var(--accent-color);
+        }
+
+        .files-container {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            transition: all 0.3s ease;
+        }
+
+        body.theme-light .files-container {
+            background-color: rgba(240, 240, 245, 0.9);
+        }
+
+        .files-container.list-view {
+            display: block;
+            grid-template-columns: none;
+        }
+
+        .file-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+            background-color: rgba(40, 40, 60, 0.3);
+        }
+
+        body.theme-light .file-item {
+            background-color: rgba(200, 200, 220, 0.5);
+        }
+
+        .file-item.list-item {
+            flex-direction: row;
+            align-items: center;
+            padding: 8px 15px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+
+        .file-item.list-item .file-icon {
+            font-size: 20px;
+            margin-right: 15px;
+            margin-bottom: 0;
+        }
+
+        .file-item.list-item .file-name {
+            text-align: left;
+            flex-grow: 1;
+        }
+
+        .file-item.list-item .file-size {
+            margin-left: 15px;
+            margin-top: 0;
+        }
+
+        .file-item:hover {
+            background-color: rgba(113, 128, 185, 0.3);
+            transform: translateY(-2px);
+        }
+
+        body.theme-light .file-item:hover {
+            background-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .file-icon {
+            font-size: var(--icon-size);
+            margin-bottom: 8px;
+            color: var(--accent-color);
+            position: relative;
+            transition: transform 0.2s ease;
+        }
+
+        .file-icon img {
+            width: var(--icon-size);
+            height: var(--icon-size);
+            object-fit: contain;
+        }
+
+        .file-name {
+            text-align: center;
+            font-size: 12px;
+            word-break: break-word;
+            width: 100%;
+            transition: color 0.2s ease;
+            color: var(--text-color);
+        }
+
+        body.theme-light .file-name {
+            color: var(--text-dark);
+        }
+
+        .file-size {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+        }
+
+        body.theme-light .file-size {
+            color: rgba(0, 0, 0, 0.6);
+        }
+
+        .preview-panel {
+            width: var(--preview-width);
+            background-color: rgba(31, 31, 56, 0.8);
+            border-left: 1px solid rgba(113, 128, 185, 0.3);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        body.theme-light .preview-panel {
+            background-color: rgba(220, 220, 230, 0.9);
+        }
+
+        .preview-panel.hidden {
+            display: none;
+        }
+
+        .preview-resize-handle {
+            position: absolute;
+            left: -5px;
+            top: 0;
+            bottom: 0;
+            width: 10px;
+            cursor: col-resize;
+            z-index: 10;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid rgba(113, 128, 185, 0.3);
+        }
+
+        .preview-header h3 {
+            font-size: 14px;
+            text-transform: uppercase;
+            color: var(--accent-color);
+            letter-spacing: 1px;
+        }
+
+        #closePreview {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        body.theme-light #closePreview {
+            color: var(--text-dark);
+        }
+
+        .preview-content {
+            flex-grow: 1;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+
+        .preview-content img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            cursor: zoom-in;
+            transition: transform 0.3s ease;
+        }
+
+        .preview-content img.zoomed {
+            transform: scale(1.5);
+            cursor: zoom-out;
+        }
+
+        .audio-player {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .video-player {
+            width: 100%;
+            max-height: 100%;
+        }
+
+        .pdf-viewer-container {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            border: 1px solid rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .pdf-viewer-container {
+            border-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .pdf-viewer {
+            width: 100%;
+        }
+
+        .file-info {
+            padding: 15px;
+            border-top: 1px solid rgba(113, 128, 185, 0.3);
+            font-size: 12px;
+        }
+
+        body.theme-light .file-info {
+            border-top-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .info-label {
+            color: var(--accent-color);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 20px;
+            background-color: rgba(31, 31, 56, 0.7);
+            border-top: 1px solid rgba(113, 128, 185, 0.3);
+            font-size: 12px;
+        }
+
+        body.theme-light .status-bar {
+            background-color: rgba(220, 220, 230, 0.9);
+        }
+
+        .storage-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .storage-bar {
+            width: 150px;
+            height: 8px;
+            background-color: rgba(67, 76, 110, 0.5);
+            border-radius: 4px;
+            margin-left: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        body.theme-light .storage-bar {
+            background-color: rgba(180, 180, 200, 0.7);
+        }
+
+        .storage-progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .storage-free {
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 0 4px 4px 0;
+        }
+
+        body.theme-light .storage-free {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        .open-dir-btn {
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        .open-dir-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 107, 223, 0.3);
+        }
+
+        .voice-assistant-btn {
+            background: linear-gradient(90deg, #9c27b0, #673ab7);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        .voice-assistant-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
+        }
+
+        .voice-assistant-btn.active {
+            background: linear-gradient(90deg, #673ab7, #9c27b0);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(156, 39, 176, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(156, 39, 176, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(156, 39, 176, 0); }
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: var(--accent-color);
+            font-size: 18px;
+        }
+
+        .error {
+            color: #ff6b6b;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .file-item.highlight {
+            background-color: var(--selection-color);
+            box-shadow: 0 0 0 2px var(--primary-color);
+        }
+
+        .particle {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: float 15s infinite linear;
+            opacity: 0.6;
+        }
+
+        body.theme-light .particle {
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0) translateX(0);
+                opacity: 0.6;
+            }
+            50% {
+                transform: translateY(-100px) translateX(50px);
+                opacity: 0.9;
+            }
+            100% {
+                transform: translateY(0) translateX(0);
+                opacity: 0.6;
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: var(--dark-color);
+            padding: 25px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+
+        body.theme-light .modal-content {
+            background-color: var(--light-color);
+            color: var(--text-dark);
+        }
+
+        .modal.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-content h3 {
+            color: var(--accent-color);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background-color: var(--system-info-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+            transition: transform 0.2s ease;
+        }
+
+        body.theme-light .info-card {
+            background-color: rgba(240, 240, 245, 0.9);
+        }
+
+        .info-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .info-card h4 {
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .info-card p {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-color);
+        }
+
+        body.theme-light .info-card p {
+            color: var(--text-dark);
+        }
+
+        .system-info-output {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #e6e6e6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 300px;
+            margin-top: 15px;
+        }
+
+        body.theme-light .system-info-output {
+            background-color: rgba(0, 0, 0, 0.1);
+            color: var(--text-dark);
+        }
+
+        .modal-btn {
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: block;
+            margin: 0 auto;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 107, 223, 0.3);
+        }
+
+        .sort-options {
+            display: flex;
+            gap: 10px;
+            padding: 10px 20px;
+            background-color: rgba(31, 31, 56, 0.5);
+            border-bottom: 1px solid rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .sort-options {
+            background-color: rgba(220, 220, 230, 0.8);
+        }
+
+        .sort-btn {
+            background-color: rgba(67, 76, 110, 0.5);
+            border: none;
+            color: var(--text-color);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        body.theme-light .sort-btn {
+            background-color: rgba(180, 180, 200, 0.7);
+            color: var(--text-dark);
+        }
+
+        .sort-btn:hover {
+            background-color: rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .sort-btn:hover {
+            background-color: rgba(150, 150, 180, 0.9);
+        }
+
+        .sort-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .settings-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            color: var(--accent-color);
+        }
+
+        .form-control {
+            background-color: rgba(67, 76, 110, 0.5);
+            border: 1px solid rgba(113, 128, 185, 0.3);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        body.theme-light .form-control {
+            background-color: rgba(180, 180, 200, 0.7);
+            color: var(--text-dark);
+            border-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .context-menu {
+            position: absolute;
+            background-color: var(--context-menu-bg);
+            border: 1px solid rgba(113, 128, 185, 0.5);
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            min-width: 150px;
+            display: none;
+            animation: fadeIn 0.15s ease;
+        }
+
+        body.theme-light .context-menu {
+            border-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .context-menu.active {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            color: var(--text-color);
+        }
+
+        body.theme-light .context-menu-item {
+            color: var(--text-dark);
+        }
+
+        .context-menu-item:hover {
+            background-color: rgba(74, 107, 223, 0.5);
+        }
+
+        .context-menu-item i {
+            margin-right: 8px;
+            width: 16px;
+            text-align: center;
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background-color: rgba(113, 128, 185, 0.3);
+            margin: 5px 0;
+        }
+
+        body.theme-light .context-menu-separator {
+            background-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .run-code-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            cursor: zoom-out;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .image-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .image-modal.active img {
+            transform: scale(1);
+        }
+
+        .image-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .image-modal-close:hover {
+            transform: scale(1.2);
+        }
+
+        .code-preview {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border-radius: 5px;
+        }
+
+        body.theme-light .code-preview {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .code-keyword {
+            color: #569cd6;
+        }
+        .code-string {
+            color: #ce9178;
+        }
+        .code-comment {
+            color: #6a9955;
+        }
+        .code-number {
+            color: #b5cea8;
+        }
+
+        .new-folder-input {
+            background: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--text-color);
+            padding: 5px;
+            border-radius: 4px;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        body.theme-light .new-folder-input {
+            color: var(--text-dark);
+        }
+
+        .file-icon.fa-file-image { color: #4CAF50; }
+        .file-icon.fa-file-pdf { color: #F44336; }
+        .file-icon.fa-file-word { color: #2196F3; }
+        .file-icon.fa-file-excel { color: #4CAF50; }
+        .file-icon.fa-file-powerpoint { color: #FF9800; }
+        .file-icon.fa-file-alt { color: #9E9E9E; }
+        .file-icon.fa-file-archive { color: #795548; }
+        .file-icon.fa-file-code { color: #673AB7; }
+        .file-icon.fa-file-audio { color: #FF5722; }
+        .file-icon.fa-file-video { color: #E91E63; }
+        .file-icon.fa-file { color: #607D8B; }
+        .file-icon.fa-folder { color: #FFC107; }
+        .file-icon.fa-cog { color: #00BCD4; }
+        .file-icon.fa-magnet { color: #3F51B5; }
+        .file-icon.fa-cogs { color: #607D8B; }
+        .file-icon.fa-file-excel { color: #4CAF50; }
+        .file-icon.fa-file-invoice { color: #9C27B0; }
+        .file-icon.fa-file-medical { color: #FF5252; }
+        .file-icon.fa-file-contract { color: #FF9800; }
+        .file-icon.fa-file-signature { color: #8BC34A; }
+        .file-icon.fa-file-upload { color: #2196F3; }
+        .file-icon.fa-file-download { color: #3F51B5; }
+        .file-icon.fa-file-prescription { color: #4CAF50; }
+        .file-icon.fa-file-export { color: #FFC107; }
+        .file-icon.fa-file-import { color: #00BCD4; }
+        .file-icon.fa-terminal { color: #4CAF50; }
+        .file-icon.fa-shortcut { color: #9C27B0; }
+
+        .zip-preview {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            padding: 15px;
+        }
+
+        .zip-file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .zip-file-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(113, 128, 185, 0.3);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        body.theme-light .zip-file-item {
+            border-bottom-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .zip-file-item:last-child {
+            border-bottom: none;
+        }
+
+        .zip-file-name {
+            flex-grow: 1;
+        }
+
+        .zip-file-size {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+        }
+
+        body.theme-light .zip-file-size {
+            color: rgba(0, 0, 0, 0.6);
+        }
+
+        .text-preview {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            padding: 15px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', Courier, monospace;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        body.theme-light .text-preview {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .system-file-preview {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+
+        .slide-in {
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 1200px) {
+            .preview-panel {
+                position: absolute;
+                right: calc(-1 * var(--preview-width));
+                height: 100%;
+                top: 0;
+            }
+            
+            .preview-panel.active {
+                right: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 200px;
+            }
+            
+            .preview-panel {
+                width: 100%;
+                height: 300px;
+                position: fixed;
+                bottom: -300px;
+                left: 0;
+                right: 0;
+            }
+            
+            .preview-panel.active {
+                bottom: 0;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .sort-options {
+                flex-wrap: wrap;
+            }
+
+            .explorer-header {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .search-box {
+                width: 100%;
+                order: 1;
+            }
+
+            .nav-buttons, .view-options {
+                order: 0;
+            }
+        }
+
+        .progress-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--dark-color);
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+        }
+
+        body.theme-light .progress-container {
+            background-color: var(--light-color);
+            color: var(--text-dark);
+        }
+
+        .progress-container.active {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .progress-bar {
+            width: 300px;
+            height: 10px;
+            background-color: rgba(67, 76, 110, 0.5);
+            border-radius: 5px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        body.theme-light .progress-bar {
+            background-color: rgba(180, 180, 200, 0.7);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--dark-color);
+            color: var(--text-color);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+
+        body.theme-light .notification {
+            background-color: var(--light-color);
+            color: var(--text-dark);
+        }
+
+        .notification.active {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .notification.error {
+            border-left: 4px solid #F44336;
+        }
+
+        .notification.warning {
+            border-left: 4px solid #FF9800;
+        }
+
+        .notification i {
+            font-size: 20px;
+        }
+
+        .drop-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(74, 107, 223, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .drop-zone-content {
+            background-color: var(--dark-color);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px dashed var(--accent-color);
+        }
+
+        body.theme-light .drop-zone-content {
+            background-color: var(--light-color);
+            color: var(--text-dark);
+        }
+
+        .drop-zone-content i {
+            font-size: 48px;
+            color: var(--accent-color);
+            margin-bottom: 15px;
+        }
+
+        .disk-usage-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(40, 40, 60, 0.3);
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        body.theme-light .disk-usage-info {
+            background-color: rgba(200, 200, 220, 0.5);
+        }
+
+        .disk-usage-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .disk-usage-label {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        .settings-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(113, 128, 185, 0.3);
+        }
+
+        body.theme-light .settings-section {
+            border-bottom-color: rgba(150, 150, 180, 0.7);
+        }
+
+        .settings-section h4 {
+            color: var(--accent-color);
+            margin-bottom: 10px;
+        }
+
+        .executable-warning {
+            background-color: rgba(255, 87, 34, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .executable-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        .executable-btn {
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .executable-btn.run {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .executable-btn.cancel {
+            background-color: #F44336;
+            color: white;
+        }
+
+        .executable-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .shortcut-preview {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .shortcut-target {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: rgba(40, 40, 60, 0.3);
+            border-radius: 5px;
+            word-break: break-all;
+        }
+
+        body.theme-light .shortcut-target {
+            background-color: rgba(200, 200, 220, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="quantum-background" id="quantumBg"></div>
+    
+    <div class="explorer-container">
+        <header class="explorer-header">
+            <div class="nav-buttons">
+                <button id="backBtn" title="Назад" disabled><i class="fas fa-arrow-left"></i></button>
+                <button id="forwardBtn" title="Вперед" disabled><i class="fas fa-arrow-right"></i></button>
+                <button id="upBtn" title="Вверх" disabled><i class="fas fa-arrow-up"></i></button>
+                <button id="refreshBtn" title="Обновить (F5)" class="refresh-btn"><i class="fas fa-sync-alt"></i></button>
+            </div>
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Квантовый поиск..." id="searchInput">
+            </div>
+            <div class="view-options">
+                <button id="viewIcons" title="Плитка" class="active"><i class="fas fa-th-large"></i></button>
+                <button id="viewList" title="Список"><i class="fas fa-list"></i></button>
+                <button id="toggleSidebar" title="Скрыть/показать боковую панель"><i class="fas fa-outdent"></i></button>
+                <button id="settingsBtn" title="Настройки"><i class="fas fa-cog"></i></button>
+                <button id="systemInfoBtn" title="Информация о системе"><i class="fas fa-info-circle"></i></button>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-toggle" id="sidebarToggle">
+                    <i class="fas fa-chevron-left"></i>
+                </div>
+                <div class="drives-list" id="drivesList">
+                    <h3>Система</h3>
+                    <button class="open-dir-btn"><i class="fas fa-folder-open"></i> <span>Открыть папку</span></button>
+                    <div class="drive-item" data-path="system"><i class="fas fa-hdd"></i> <span>Диск C:</span></div>
+                    <div class="drive-item" data-path="desktop"><i class="fas fa-desktop"></i> <span>Рабочий стол</span></div>
+                    <div class="disk-usage-info" id="diskUsageInfo">
+                        <div class="disk-usage-row">
+                            <span class="disk-usage-label">Всего:</span>
+                            <span id="diskTotal">—</span>
+                        </div>
+                        <div class="disk-usage-row">
+                            <span class="disk-usage-label">Использовано:</span>
+                            <span id="diskUsed">—</span>
+                        </div>
+                        <div class="disk-usage-row">
+                            <span class="disk-usage-label">Свободно:</span>
+                            <span id="diskFree">—</span>
+                        </div>
+                    </div>
+                    <button id="voiceAssistantBtn" class="voice-assistant-btn" onclick="window.location.href='Голосовой помощник.html'"><i class="fas fa-microphone"></i> <span>Голосовой помощник</span></button>
+                </div>
+                <div class="quick-access">
+                    <h3>Быстрый доступ</h3>
+                    <ul id="quickAccessList">
+                        <li data-path="downloads"><i class="fas fa-download"></i> <span>Загрузки</span></li>
+                        <li data-path="documents"><i class="fas fa-file-alt"></i> <span>Документы</span></li>
+                        <li data-path="pictures"><i class="fas fa-image"></i> <span>Изображения</span></li>
+                        <li data-path="music"><i class="fas fa-music"></i> <span>Музыка</span></li>
+                        <li data-path="videos"><i class="fas fa-video"></i> <span>Видео</span></li>
+                    </ul>
+                </div>
+            </aside>
+            
+            <main class="file-explorer">
+                <div class="path-navigator" id="pathNavigator">
+                </div>
+                
+                <div class="sort-options" id="sortOptions">
+                    <button class="sort-btn" data-sort="name" data-order="asc"><i class="fas fa-sort-alpha-down"></i> По имени</button>
+                    <button class="sort-btn" data-sort="size" data-order="asc"><i class="fas fa-sort-numeric-down"></i> По размеру</button>
+                    <button class="sort-btn" data-sort="date" data-order="desc"><i class="fas fa-sort-numeric-down-alt"></i> По дате</button>
+                    <button class="sort-btn" data-sort="type" data-order="asc"><i class="fas fa-sort-alpha-down"></i> По типу</button>
+                </div>
+                
+                <div class="files-container" id="filesContainer">
+                </div>
+            </main>
+            
+            <aside class="preview-panel" id="previewPanel">
+                <div class="preview-resize-handle" id="previewResizeHandle"></div>
+                <div class="preview-header">
+                    <h3>Предпросмотр</h3>
+                    <button id="closePreview"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="preview-content" id="previewContent">
+                    Выберите файл для предпросмотра
+                </div>
+                <div class="file-info" id="fileInfo">
+                </div>
+            </aside>
+        </div>
+        
+        <footer class="status-bar">
+            <div class="selected-info" id="selectedInfo">
+                Выбрано: 0 элементов
+            </div>
+        </footer>
+    </div>
+    
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" id="openFile"><i class="fas fa-folder-open"></i> Открыть</div>
+        <div class="context-menu-item" id="openWith"><i class="fas fa-external-link-alt"></i> Открыть с помощью...</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="copyFile"><i class="fas fa-copy"></i> Копировать</div>
+        <div class="context-menu-item" id="cutFile"><i class="fas fa-cut"></i> Вырезать</div>
+        <div class="context-menu-item" id="pasteFile"><i class="fas fa-paste"></i> Вставить</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="newFolder"><i class="fas fa-folder-plus"></i> Новая папка</div>
+        <div class="context-menu-item" id="deleteFile"><i class="fas fa-trash"></i> Удалить</div>
+        <div class="context-menu-item" id="renameFile"><i class="fas fa-edit"></i> Переименовать</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="propertiesFile"><i class="fas fa-info-circle"></i> Свойства</div>
+    </div>
+    
+    <div class="modal" id="systemInfoModal">
+        <div class="modal-content">
+            <h3>Информация о системе</h3>
+            <div class="info-grid" id="systemInfoGrid">
+            </div>
+            <button class="modal-btn" id="getSystemDetailsBtn">Получить детальную информацию</button>
+            <div id="systemDetailsOutput" class="system-info-output" style="display: none; margin-top: 15px;"></div>
+            <button class="modal-btn" id="closeSystemInfoModal" style="margin-top: 15px;">Закрыть</button>
+        </div>
+    </div>
+    
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <h3>Настройки</h3>
+            <form class="settings-form" id="settingsForm">
+                <div class="settings-section">
+                    <h4>Внешний вид</h4>
+                    <div class="form-group">
+                        <label for="themeSelect">Тема оформления:</label>
+                        <select id="themeSelect" class="form-control">
+                            <option value="quantum">Квантовая</option>
+                            <option value="dark">Темная</option>
+                            <option value="light">Светлая</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="defaultView">Вид по умолчанию:</label>
+                        <select id="defaultView" class="form-control">
+                            <option value="icons">Плитка</option>
+                            <option value="list">Список</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="iconSize">Размер иконок:</label>
+                        <select id="iconSize" class="form-control">
+                            <option value="small">Маленькие</option>
+                            <option value="medium" selected>Средние</option>
+                            <option value="large">Большие</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4>Поведение</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="saveSession"> Сохранять последнюю сессию
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="showHidden"> Показывать скрытые файлы
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableHotkeys"> Включить горячие клавиши
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableAnimations"> Включить анимации
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="showPreview" checked> Показывать панель предпросмотра
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="confirmDeletion" checked> Подтверждать удаление
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="confirmExecutable" checked> Предупреждать о запуске исполняемых файлов
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="autoRefresh" checked> Автоматически обновлять содержимое папки
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="showShortcuts" checked> Показывать ярлыки
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4>Дополнительно</h4>
+                    <div class="form-group">
+                        <label for="defaultPath">Путь по умолчанию:</label>
+                        <select id="defaultPath" class="form-control">
+                            <option value="desktop">Рабочий стол</option>
+                            <option value="documents">Документы</option>
+                            <option value="downloads">Загрузки</option>
+                            <option value="pictures">Изображения</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sortPreference">Сортировка по умолчанию:</label>
+                        <select id="sortPreference" class="form-control">
+                            <option value="name">По имени</option>
+                            <option value="size">По размеру</option>
+                            <option value="date">По дате</option>
+                            <option value="type">По типу</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="languageSelect">Язык интерфейса:</label>
+                        <select id="languageSelect" class="form-control">
+                            <option value="ru">Русский</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button type="submit" class="modal-btn">Сохранить</button>
+            </form>
+            <button class="modal-btn" id="closeSettingsModal" style="margin-top: 10px;">Закрыть</button>
+            <button class="modal-btn" id="resetSettingsBtn" style="margin-top: 10px; background-color: #F44336;">Сбросить настройки</button>
+        </div>
+    </div>
+
+    <div class="progress-container" id="progressContainer">
+        <div id="progressText">Копирование файлов...</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notificationText">Операция выполнена успешно</span>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-content">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h3>Перетащите файлы сюда</h3>
+            <p>Отпустите для загрузки</p>
+        </div>
+    </div>
+
+    <div class="modal" id="executableModal">
+        <div class="modal-content">
+            <h3>Предупреждение</h3>
+            <div class="executable-warning">
+                <p>Вы собираетесь запустить исполняемый файл. Это может быть опасно, если вы не доверяете источнику файла.</p>
+                <p>Вы уверены, что хотите продолжить?</p>
+            </div>
+            <div class="executable-actions">
+                <button class="executable-btn run" id="runExecutableBtn">Запустить</button>
+                <button class="executable-btn cancel" id="cancelExecutableBtn">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="024.js"></script>
+</body>
+</html>
